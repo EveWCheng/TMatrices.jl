@@ -1,16 +1,19 @@
 
 module LS
 
+export SetupMatrix,
+    Quadrature
+
 using BesselFunctions
 using LegendrePolynomials
 using QuadGK
 using Dierckx
+using DanUtils
 
 
 Δk_func(k1,k2,cosθ) = sqrt(k2^2 + k1^2 - 2*k1*k2*cosθ)
 
 function VkkFromVΔk(k1, k2, l, VΔk_func)
-    (Vl_fromspl.(VΔk_spl), k1,k2, l)
     val,err = quadgk(cosθ -> VΔk_func(Δk_func(k1,k2,cosθ)) * Pl(cosθ,l),
                      -1, 1,
                      rtol=1e-4, atol=0.)
@@ -69,61 +72,5 @@ function SetupMatrix(k_list,
 end
     
 include("quadrature.jl")
-
-
-
-function Test(target_k=1.0, l=0 ; kwds...)
-    # k_list = linspace(0,10,1001) .+ 0.001
-    # k_in = k_list[101]
-    # k_list = linspace(0,10,11) .+ 0.001
-    # k_list = linspace(0,10,101) .+ 0.001
-    # k_list = linspace(0,10,201) .+ 0.001
-    # k_list = linspace(0,100,101) .+ 0.001
-    # k_list = linspace(0,100,201) .+ 0.001
-    # k_list = linspace(0,100,501) .+ 0.001
-    # k_list = linspace(0,20,201) .+ 0.001
-    # k_list = linspace(0,spread*target_k,N+1) |> RunningAvg
-    # k_in = k_list[length(k_list)÷2]
-
-    mass = 1.
-    
-    # en = 1.0 - im*1e-3
-    # en = 1.0
-    en = target_k^2/2mass
-    # rmin,rmax = 1e-4,20.
-    rmin,rmax = 1e-8,10.
-    
-    # l,m = 0,0
-    # l′,m′ = l,m
-
-    k_list,u = Quadrature(en ; kwds...)
-    # k_list,u = KMatQuadrature(en ; kwds...)
-
-
-    k_in = target_k
-    @show k_in
-    # k_in = target_k
-
-    
-    # potfunc = R -> Gaussian(R, height=1e-1)
-    potfunc = R -> Gaussian(R, height=1.)
-    # potfunc = R -> Gaussian(R, height=10.)
-    # potfunc = R -> Gaussian(R, height=1e-3)
-
-    # potfunc = R -> SquareWell(R, height=1e-2)
-    # potfunc = R -> SquareWell(R, height=1e-3)
-    # potfunc = R -> SquareWell(R, height=1)
-    # potfunc = R -> SquareWell(R, height=1e2)
-    # potfunc = R -> SquareWell(R, height=1e3)
-
-    # potfunc = R -> SquareWell(R, height=-1)
-    # potfunc = R -> SquareWell(R, height=-1e-2)
-    
-    M,RHS,Vmat = SetupMatrix(k_list, k_in, potfunc, rmin, rmax, en, l, u)
-
-    T = (I - M)\RHS
-    # T = (I + M)\RHS
-    @AutoNT (k_list, k_in, M, RHS, en, Vmat, T, potfunc, u)
-end
 
 end

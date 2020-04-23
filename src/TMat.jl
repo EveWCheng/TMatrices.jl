@@ -1,8 +1,10 @@
 module TMat
 
-export LS
+export LS,
+    ODE
 
 include("LS.jl")
+include("ODE.jl")
 
 
 SquareWell(R ; width=1., height=0.1) = (R < width ? height : 0.)

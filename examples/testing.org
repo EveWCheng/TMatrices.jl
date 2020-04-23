@@ -1,0 +1,193 @@
+#+BEGIN_SRC jupyter-julia
+using TMat
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+:END:
+
+#+BEGIN_SRC jupyter-julia
+  # target_k = 1.0
+  target_k = 0.1
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: 0.1
+:END:
+
+#+BEGIN_SRC jupyter-julia
+    mass = 1.
+    hbr = 1.
+    
+    en = target_k^2/2mass
+    rmin,rmax = 1e-8,10.
+    
+    l = 0
+
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: 0
+:END:
+
+#+BEGIN_SRC jupyter-julia
+  Gaussian = TMat.Gaussian
+  SquareWell = TMat.SquareWell
+    # potfunc = R -> Gaussian(R, height=1e-1)
+    # potfunc = R -> Gaussian(R, height=10.)
+    # potfunc = R -> Gaussian(R, height=1e-3)
+    potfunc = R -> Gaussian(R, height=1.)
+
+    # potfunc = R -> SquareWell(R, height=1e-2)
+    # potfunc = R -> SquareWell(R, height=1e-3)
+    # potfunc = R -> SquareWell(R, height=1)
+    # potfunc = R -> SquareWell(R, height=1e2)
+    # potfunc = R -> SquareWell(R, height=1e3)
+
+    # potfunc = R -> SquareWell(R, height=-1)
+    # potfunc = R -> SquareWell(R, height=-1e-2)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: #27 (generic function with 1 method)
+:END:
+
+#+BEGIN_SRC jupyter-julia
+    k_list,u = TMat.LS.Quadrature(en)
+
+    M,RHS,Vmat = TMat.LS.SetupMatrix(k_list, target_k, potfunc, en, l, u ; rmin=rmin, rmax=rmax )
+
+    T = (I - M)\RHS
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: Calculating VΔk_spl... done! (0.872 s)
+: Calc Vmat... done! (0.146 s)
+#+BEGIN_EXAMPLE
+21-element Array{Complex{Float64},1}:
+      0.3400535124231938 - 0.036538085678536905im
+     0.34004181569320396 - 0.036536828887746856im
+      0.3399296510247709 - 0.03652477701321656im
+      0.3394715203820251 - 0.03647555177052658im
+     0.33866951048789234 - 0.03638937737397929im
+      0.3381141987138837 - 0.0363297102085604im
+      0.3374694257115209 - 0.03626043060890072im
+      0.3360006400803241 - 0.03610261246182839im
+     0.33447015988403045 - 0.03593816535424525im
+     0.33314704529547234 - 0.03579599927616316im
+     0.33234298508836785 - 0.03570960457749194im
+      0.3177630579476001 - 0.034143019885394345im
+     0.20181303862708164 - 0.02168441679621728im
+    0.022656297214649124 - 0.002434374880848264im
+   -0.001198373888151386 + 0.00012876293348120185im
+    6.074977017500807e-6 - 6.527444141919338e-7im
+   -4.657107253054819e-9 + 5.003970775472767e-10im
+   6.447402296295441e-13 - 6.927607829348526e-14im
+   7.015706558482329e-18 - 7.538239658300813e-19im
+  -1.799651000527107e-17 + 1.9336898472288537e-18im
+ -2.2945187975541146e-15 + 2.4654156288117017e-16im
+#+END_EXAMPLE
+:END:
+
+#+BEGIN_SRC jupyter-julia
+  ind = findfirst(==(target_k), k_list)
+  T_ls = T[ind]
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: 0.3381141987138837 - 0.0363297102085604im
+:END:
+
+#+BEGIN_SRC jupyter-julia
+  # using Scattering
+  f_ls = -(2pi)^2*mass / (hbr^2) * T_ls
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: -13.348213534789393 + 1.4342394710588349im
+:END:
+
+** ODE version
+
+#+BEGIN_SRC jupyter-julia
+potode = R -> potfunc(ustrip(a0,R)) * Eₕ
+E_ode = en*Eh
+k_ode = TMat.ODE.kFromE(E_ode)
+κ = k_ode
+rspan = (0.001a0, 50.0a0)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+| 0.001 | a₀ | 50.0 | a₀ |
+:END:
+
+#+BEGIN_SRC jupyter-julia
+r,u,u′ = TMat.ODE.SolveOutwards2(rspan, E_ode, k_ode, potode, l)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: '(Quantity(Float64 𝐋 Unitful.FreeUnits((a₀ ) 𝐋 nothing))(0.001 a₀  0.0038083820359996047 a₀  0.010302545284744731 a₀  0.018653484451719504 a₀  0.02872381982617895 a₀  0.04050117585491518 a₀  0.05380072248082904 a₀  0.06847898025574228 a₀  0.08434099172257963 a₀  0.10121583906628567 a₀  …  48.160896914372955 a₀  48.370246973325095 a₀  48.58057270332769 a₀  48.79166259594066 a₀  49.00339664998557 a₀  49.21548587970433 a₀  49.42768293162018 a₀  49.639706418948506 a₀  49.85129742500226 a₀  50.0 a₀)  Quantity(Complex(Float64) 𝐋 Unitful.FreeUnits((a₀ ) 𝐋 nothing))(-0.003544907695902859 + 0.0im a₀ -0.003544881383246212 + 0.0im a₀ … -105.81611626979434 + 0.0im a₀ -105.59818622508544 + 0.0im a₀; -0.003544907695902859 + 0.0im a₀ -0.0007364920009344483 + 0.0im a₀ … -145.29665405314822 + 0.0im a₀ -144.97612752346743 + 0.0im a₀)  Complex(Float64)(0.0 + 0.0im 2.8058190629684907e-5 + 0.0im … 1.3869200985257313 + 0.0im 1.5441122509852112 + 0.0im; 1.0 + 0.0im 1.0000359057412445 + 0.0im … 2.0475349365590896 + 0.0im 2.2633604639617766 + 0.0im))
+:END:
+
+  #+BEGIN_SRC jupyter-julia
+    X = TMat.ODE.MatchSolution(u[end], u′[end], r[end], κ, l)
+    soln2 = TMat.ODE.EliminateIngoing(u, u′, r, κ, l)
+    soln2 = TMat.ODE.AddBesselPart(r, soln2..., κ, l)
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  : 2×2 Array{Complex{Float64},2}:
+  :  52.8204-7.57367im  72.7207-9.71017im
+  :  52.8204+7.57367im  72.7207+9.71017im
+  | Quantity | (Complex (Float64) 𝐋 Unitful.FreeUnits ((a₀) 𝐋 nothing)) | (-4.336808689942018e-19 + 0.0im a₀ 0.0024728311834068435 - 0.00026548217009671665im a₀ 0.008191273063298157 - 0.0008794118107582113im a₀ 0.015545778374266267 - 0.0016689885691900921im a₀ 0.024417483637466014 - 0.0026214513096865324im a₀ 0.03479940694272338 - 0.003736050457154475im a₀ 0.04653485145213884 - 0.0049959631015416795im a₀ 0.059506014683505 - 0.0063885420153183764im a₀ 0.0735520413095267 - 0.007896517834668512im a₀ 0.08853539458832466 - 0.009505124669810716im a₀ … -35.24634568290837 + 3.7840336221345847im a₀ -35.241019569464534 + 3.7834618127184036im a₀ -35.22011583320729 + 3.7812175959267513im a₀ -35.18347143882575 + 3.777283468353625im a₀ -35.13096660984275 + 3.771646570844192im a₀ -35.06258498830138 + 3.764305147214726im a₀ -34.97838537506314 + 3.7552655103022534im a₀ -34.87852460552098 + 3.744544497892065im a₀ -34.76323674462176 + 3.7321672391035445im a₀ -34.67289892005099 + 3.7224686062693007im a₀) | Complex | (Float64) | (0.8805157856604962 - 0.09453182374524625im 0.8805226955526915 - 0.0945325655885178im 0.8805916011035118 - 0.09453996326098617im 0.8807888117745954 - 0.09456113572001892im 0.8811891181279141 - 0.09460411245053554im 0.8818826035344034 - 0.09467856476732957im 0.8829576462490873 - 0.09479398092462991im 0.8845033550641563 - 0.09495992760684409im 0.886597064446041 - 0.09518470741146001im 0.8893066172729198 - 0.09547560392283462im … -0.011452427453996161 + 0.0012295280461375939im 0.06233293777401261 - 0.006692039351405757im 0.13643461818735536 - 0.014647566221152259im 0.210744805911457 - 0.02262547835266393im 0.2851873921941042 - 0.03061760474064281im 0.359626664009663 - 0.038609375288755785im 0.43394188968227254 - 0.0465878282924106im 0.5080011924257752 - 0.05453880551241607im 0.5816817931301457 - 0.06244912543246382im 0.6333094053342192 - 0.06799184529818403im) |
+  :END:
+
+  #+BEGIN_SRC jupyter-julia
+    using Plots
+    using UnitfulRecipes
+    plot(r,abs.(soln2[1]))
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  [[file:./.ob-jupyter/396dabe8e669ffea9f0d17c90a036d0bef5fc494.svg]]
+  :END:
+
+  #+BEGIN_SRC jupyter-julia
+    costh = 0.
+    u2 = soln2[1]
+    T_ode = TMat.ODE.Tmat_l(r, u2, potode, k_ode, costh, l)
+    T_ode * 4π
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  : 0.33777371699634284 - 0.03626325160874007im a₀^3 Eₕ
+  :END:
+
+  #+BEGIN_SRC jupyter-julia
+f_ode = TMat.ODE.fFromT(T_ode)
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  : -1.0611474278914286 + 0.11392436484929605im a₀
+  :END:
+  
+  #+BEGIN_SRC jupyter-julia
+TMat.ODE.TCSandOptTheorem(f,κ)
+  #+END_SRC
+
+  #+RESULTS:
+  :RESULTS:
+  | DCS | = | 0.5275421420250745 | a₀^2 | TCS | = | 6.62929007137999 | a₀^2 | opt | = | 66.33161330832445 | a₀^2 | a | = | 0.7263209635037905 | a₀ |
+  :END:
