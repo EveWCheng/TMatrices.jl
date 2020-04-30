@@ -1,5 +1,12 @@
 
 using FastGaussQuadrature
+
+"""
+ScaleGaussLegendre(N, a, b)
+
+Uses `gausslegendre` from the `FastGaussQuadrature` package, and scales it to
+calculate an integral from `a` to `b` instead of -1 to 1.
+"""
 function ScaleGaussLegendre(N, a, b)
     x,w = gausslegendre(N)
     mid = (b+a)/2
@@ -10,6 +17,14 @@ function ScaleGaussLegendre(N, a, b)
 
     return x,w
 end
+
+"""
+ScaleGaussLaguerre(N, a, scale=1.)
+
+Uses `gausslaguerre` from the `FastGaussQuadrature` package, and scales it to
+calculate an integral from `a` to Inf instead of 0 to Inf. The `scale` parameter
+allows for a typical length scale to be set.
+"""
 function ScaleGaussLaguerre(N, a, scale=1.)
     x,w = gausslaguerre(N)
     w = scale * exp.(log.(w) .+ x)
@@ -32,6 +47,19 @@ end
     Quadrature(en_target, ...)
     
 This is the workhorse of the code. It figures out how to approximate the integral in the Lippmann-Schwinger equations and evaluates the Greens function too.
+    
+The standard grid is to put a Legendre region around the divergence at
+k=sqrt(2m*en) of size `sym_size`. This includes a special point at the
+divergence if on-shell. If this region does not go down to k=0, another Legendre
+grid covers that inner range. Finally, a Laguerre grid covers the larger k
+values.
+    
+The number of points in each region can be configured with `N` and if different
+values are required `N_inner`, `N_mid`, and `N_outer`. The outer grid is
+configured with `outer_style`, in which a Legendre grid can be chosen instead.
+    
+An alternative style is not yet implemented but includes an additional region
+just around the divergence.
 """
 function Quadrature(en_target ; N=10,
                     N_inner=N,
@@ -43,42 +71,46 @@ function Quadrature(en_target ; N=10,
                     mass = 1.,
                     ħ = 1.
                     )
-    k_target = sqrt(2mass * en_target) / ħ
+    κ = sqrt(2mass * en_target) / ħ
 
-    if k_target < sym_size
-        sym_size = k_target
+    if real(κ) < sym_size
+        sym_size = real(κ)
     end
 
     Gfunc(x) = 1/(en_target - ħ^2*x^2/2mass)
 
     regions = []
 
-    if sym_inner_frac == nothing
-        isreal(en_target) && @assert iseven(N_mid)
-
-        # a) create one region spanning (k_target - sym_size) : (k_target + sym_szie)
-        x,w = ScaleGaussLegendre(N_mid, k_target - sym_size, k_target + sym_size)
-
-        w .*= Gfunc.(x)
-        push!(regions, (x,w))
+    if sym_size == 0
+        # This should only happen when the energy is negative.
     else
-        # b) Create two regions from (k_target - sym_size) : (k_target - sym_inner_size) and
-        # similar above. Then apply the special rule above.
-        error("Not implemented")
-        sym_inner_size = sym_size * sym_inner_frac
-    end
+        if sym_inner_frac == nothing
+            isreal(en_target) && @assert iseven(N_mid)
 
-    if isreal(en_target)
-        # Got to have the divergence always
-        push!(regions, ([k_target], [DivergenceQuad(k_target)]))
+            # a) create one region spanning (κ - sym_size) : (κ + sym_szie)
+            x,w = ScaleGaussLegendre(N_mid, real(κ) - sym_size, real(κ) + sym_size)
+
+            w = w .* Gfunc.(x)
+            push!(regions, (x,w))
+        else
+            # b) Create two regions from (κ - sym_size) : (κ - sym_inner_size) and
+            # similar above. Then apply the special rule above.
+            error("Not implemented")
+            sym_inner_size = sym_size * sym_inner_frac
+        end
+
+        if isreal(κ)
+            # Got to have the divergence always
+            push!(regions, ([κ], [DivergenceQuad(κ)]))
+        end
     end
 
     # Then create a Gauss-Laguerre region above and a Gauss-Legendre region below (if sym_size != k_target).
-    if sym_size != k_target
+    if sym_size != real(κ)
         a = 0
-        b = k_target - sym_size
+        b = real(κ) - sym_size
         x,w = ScaleGaussLegendre(N_inner, a, b)
-        w .*= Gfunc.(x)
+        w = w .* Gfunc.(x)
         lower = (x,w)
 
         pushfirst!(regions, lower)
@@ -86,20 +118,19 @@ function Quadrature(en_target ; N=10,
 
     if outer_style[1] == :laguerre
         laguerre_scale = outer_style[2]
-        x,w = ScaleGaussLaguerre(N_outer, k_target + sym_size, laguerre_scale)
-        w .*= Gfunc.(x)
+        x,w = ScaleGaussLaguerre(N_outer, real(κ) + sym_size, laguerre_scale)
+        w = w .* Gfunc.(x)
         outer = (x,w)
         push!(regions, outer)
     elseif outer_style[1] == :legendre
         legendre_max = outer_style[2]
-        x,w = ScaleGaussLegendre(N_outer, k_target + sym_size, k_target + sym_size + legendre_max)
-        w .*= Gfunc.(x)
+        x,w = ScaleGaussLegendre(N_outer, real(κ) + sym_size, real(κ) + sym_size + legendre_max)
+        w = w .* Gfunc.(x)
         outer = (x,w)
         push!(regions, outer)
     else
         error("Unknown outer_style $(outer_style[1])")
     end
-    
 
     # x = vcat(first.(regions)...)
     # u = vcat(last.(regions)...)
@@ -115,6 +146,7 @@ function Quadrature(en_target ; N=10,
         (x,u)
     end
 
+    x = Vector{Float64}(x)
     inds = sortperm(x)
     x = x[inds]
     u = u[inds]

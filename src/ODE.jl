@@ -2,162 +2,65 @@ module ODE
 
 using DanUtils
 using Constants
-#using Scattering
 using BesselFunctions
-# using Plots, UnitfulRecipes
-# pyplot()
+using DifferentialEquations
+using LegendrePolynomials
+using QuadGK
+using Dierckx
 
 kFromE(E,m=1mₑ) = uconvert(u"a0^-1", sqrt(2*m*E) / ħ)
 EFromk(k,m=1mₑ) = uconvert(Eh, ħ^2*k^2/2m )
 
-# This is solving for tildeu = r*tildeR
-# function DerivFunc(u,u′,r, E,k,potential,l,m=1mₑ)
-#     prefac = 2m/ħ^2
-
-#     # Expressing this as the plane wave expansion with the Y_l0 at the end,
-#     # gives rise to the sqrt() prefactors.
-#     jl = sqrt(4pi)*sqrt(2l+1) * 1/k * ricj(l, k*r)
-#     #jl = sqrt(2l+1) * 1/k * ricj(l, k*r)
-#     U = -prefac*potential(r)
-
-#     u′′ = @. (l*(l+1)/r^2)*u - ((prefac*E + U)*u + U*jl)
-
-#     du = u′
-#     du′ = u′′
-
-#     return du,du′
-# end
+"""
+    DerivFunc(u,u′,r, E,k,potential,l,m=1mₑ)
+    
+This is the differential equation derivative function. This function should work
+in Unitful quantities.
+"""
 function DerivFunc(u,u′,r, E,k,potential,l,m=1mₑ)
-    prefac = 2m/ħ^2
-
     # Expressing this as the plane wave expansion with the Y_l0 at the end,
     # gives rise to the sqrt() prefactors.
     jl = sqrt(4pi)*sqrt(2l+1) * 1/k * ricj(l, k*r)
-    #jl = sqrt(2l+1) * 1/k * ricj(l, k*r)
+
+    prefac = 2m/ħ^2
     U = -prefac*potential(r)
 
-
-    # ΔE = ħ^2*k^2/2m - E
     u′′ = @. (l*(l+1)/r^2)*u - ((prefac*E + U)*u + U*jl)
-    # u′′ = @. (l*(l+1)/r^2)*u - ((prefac*E + U)*u + prefac*ΔE*jl)
 
-    du = u′
-    du′ = u′′
-
-    return du,du′
+    return u′,u′′
 end
 
-using DifferentialEquations
-# RenormCond(u,t,int) = any(abs2.(u) .> 1e3)
-function RenormCond(u,t,int)
-    # Dodgy for now
-    # t > int.sol.t[1]+0.1
-    false
-end
-function RenormAffect!(int)
-    # maxval = sqrt.(maximum(abs2.(int.u), dims=1))
 
-    # int.u ./= maxval
-    # for u_i = int.sol.u
-    #     u_i ./= maxval
-    # end
+"""
+    SolveOutwards(rspan, E,k,potential,l ; init_derivs=[0.0,1.0])
+    
+Calculates the wavefunction for the off-shell T-matrix problem. Integrates 
+outwards using `DifferentialEquations` with `rspan`. The ODE derivative is
+created from the `potential` given (which should handle `Unitful` quantities).
+    
+The incoming wave has a wavenumber of `k` and the energy that the problem is
+calculated on is `E`.
 
-    # if cond(int.u) > 1e3
-        @warn "Going to terminate because cond" int.t cond(int.u)
-        terminate!(int)
-    # end
-end
-function SolveOutwards(r_list, E,k,potential,l)
+TODO: Put the ODE here.
 
-    # Going to deal with unitless in the deriv funcs
+Note: the inhomogeneous part is not included in the solution. i.e. this is
+solving for \tilde{f}. Also not that there are two solutions calculated, which
+need to be matched to the appropriate boundary conditions using e.g. `ElminateIngoing`.
+    
+Returns (r,u,u′)
+"""
+function SolveOutwards(rspan, E,k,potential,l ; init_derivs=[0.0,1.0])
+    # Going to deal with units in the deriv funcs
     # Note: wavefunctions are unitless in the picture with \phi_k = (2\pi)^-3/2 exp(ikr)
     # But u = r*R so there is units for u.
 
-    # prob_func = (u,p,t) -> DerivFunc(u,t, E,k,potential,l)  
-
-    # unitless_potential = r -> ustrip(u"Eₕ", potential(r*u"a₀"))
     prob_func = function (f,p,r)
         r = r*a0
         u = f[1,:] .* a0
         u′ = f[2,:]
         du,du′ = DerivFunc(u, u′,r, E, k, potential,l)
-        #@show du du′
         [ustrip.(NoUnits, du)' ; ustrip.(1/a0, du′)']
     end
-
-    # TODO: Callback for exp growth. Also do orthogonalising here.
-
-    # Not sure if I will need to make this a more carefully chosen derivative.
-    # At least the value being zero will be necessary.
-    u0 = [0. -1.0 ; 0. 1.0]
-    rspan = extrema(r_list)
-    local sol
-    prev_solns = zeros(ComplexF64,2,2,0)
-    prev_r = typeof(1.0a0)[]
-    while true
-        prob = ODEProblem(prob_func, u0, ustrip.(a0, rspan))
-        sol = solve(prob, Tsit5(), abstol=1e-10, reltol=1e-12, callback=DiscreteCallback(RenormCond, RenormAffect!))
-
-        this_r = filter(x -> rspan[1] <= x <= sol.t[end]*a0, r_list)
-        this_soln = sol.(ustrip.(a0,this_r))
-        this_soln = reduce((x,y) -> cat(x,y,dims=3), this_soln)
-
-        u = sol.u[end][1,:]
-        u′ = sol.u[end][2,:]
-        coeffs = MatchSolutionUnitless(u, u′, sol.t[end], ustrip(1/a0,k), l)
-
-        conv = TransformToPureIngoingOutgoing(coeffs)
-
-        prev_r = vcat(prev_r, this_r)
-        prev_solns = cat(prev_solns, this_soln, dims=3)
-        # prev_solns = mapslices(mat -> mat*conv, prev_solns, dims=[1,2])
-        
-        # new_start = (sol.t[end]*a0 + rspan[1])/2.
-        # rspan = (new_start, rspan[2])
-        rspan = (this_r[end], rspan[2])
-        u0 = prev_solns[:,:,end]
-
-        if rspan[1] == rspan[2]
-            break
-        end
-
-
-    end
-
-    # out_r_list = filter(x -> rspan[1] <= x <= rspan[2], r_list)
-
-    #return sol
-    # out = sol.(ustrip.(a0,out_r_list))
-    # out = reduce((x,y) -> cat(x,y;dims=3), out)
-
-    # out ./= out[1:1,:,end:end]
-
-    # return out_r_list, out
-
-    u = prev_solns[1,:,:] .* a0
-    u′ = prev_solns[2,:,:]
-    return prev_r, u, u′
-end
-
-function SolveOutwards2(rspan, E,k,potential,l ; init_derivs=[0.0,1.0])
-
-    # Going to deal with unitless in the deriv funcs
-    # Note: wavefunctions are unitless in the picture with \phi_k = (2\pi)^-3/2 exp(ikr)
-    # But u = r*R so there is units for u.
-
-    # prob_func = (u,p,t) -> DerivFunc(u,t, E,k,potential,l)  
-
-    # unitless_potential = r -> ustrip(u"Eₕ", potential(r*u"a₀"))
-    prob_func = function (f,p,r)
-        r = r*a0
-        u = f[1,:] .* a0
-        u′ = f[2,:]
-        du,du′ = DerivFunc(u, u′,r, E, k, potential,l)
-        #@show du du′
-        [ustrip.(NoUnits, du)' ; ustrip.(1/a0, du′)']
-    end
-
-    # TODO: Callback for exp growth. Also do orthogonalising here.
 
     # Not sure if I will need to make this a more carefully chosen derivative.
     # At least the value being zero will be necessary.
@@ -165,10 +68,7 @@ function SolveOutwards2(rspan, E,k,potential,l ; init_derivs=[0.0,1.0])
 
     # Needs to include the jl part that is in f, as the BC is for f not tildef.
     jl = sqrt(4pi)*sqrt(2l+1) * 1/k * ricj(l, k*rspan[1])
-    # jl′ = sqrt(4pi)*sqrt(2l+1) * 1/k * dricjdr(l, k, rspan[1])
-    # u0 .+= [jl ; jl′]
     u0 .-= [ustrip(a0, jl) ; 0.]
-    # @show u0
 
     prob = ODEProblem(prob_func, u0, ustrip.(a0, rspan))
     sol = solve(prob, Tsit5(), abstol=1e-10, reltol=1e-12)
@@ -179,13 +79,11 @@ function SolveOutwards2(rspan, E,k,potential,l ; init_derivs=[0.0,1.0])
     u = this_soln[1,:,:] .* a0
     u′ = this_soln[2,:,:]
     return r, u, u′
-    # return r, this_soln
 end
 
-function MatchBackwards(sets, coeffs)
-
-end
-
+"""
+Old function, hasn't been tested since included in the module.
+"""
 function SolveInwards(r_list, E,k,potential,l, A)
 
     prob_func = function (f,p,r)
@@ -220,13 +118,11 @@ function SolveInwards(r_list, E,k,potential,l, A)
     return r, u, u′
 end
 
-MatchSolution(sol, k, l) = MatchSolution(UnitfulSolution(sol[end],sol.t[end])..., k, l)
 function MatchSolution(u, u′, r, k, l)
     u = ustrip.(a0,u)
     u′ = u′
     r = ustrip(a0,r)
     k = ustrip(1/a0,k)
-    # E = ustrip(Eh,E)
     MatchSolutionUnitless(u,u′,r,k,l)
 end
 function MatchSolution(f, r, k, l)
@@ -238,49 +134,37 @@ function MatchSolutionUnitless(u, u′, r, k, l)
     f = [u' ; u′']
     MatchSolutionUnitless(f, r, k, l)
 end
-function TildeF(f, r, k, l)
-    jl = @. sqrt(4pi)*sqrt(2l+1) * 1/k * ricj(l, k*r)
-    jl′ = @. sqrt(4pi)*sqrt(2l+1) * 1/k * dricjdr(l, k, r)
-
-    jl = ustrip.(a0,jl)
-    if ndims(f) == 2
-        tildef = f .- vcat(jl,jl′)
-    elseif ndims(f) == 3
-        tildef = f .- reshape(vcat(jl,jl), 2, 1, :)
-    end
-end
 function MatchSolutionUnitless(f, r, κ, l)
     M = [rich₊(l,κ*r)    rich₋(l,κ*r) ;
          drich₊dr(l,κ,r) drich₋dr(l,κ,r)]
     coeffs = M\f
 end
-UnitfulSolution(f,r) = f[1,:].*a0, f[2,:], r*a0
 
+"""
+TransformToPureIngoingOutgoing(C)
+
+Given a coeff matrix `C`, relating two solutions obtained from `SolveOutwards`
+to the ingoing/outgoing states, combine the two solutions to satisfy the
+boundary conditions.
+
+Note: because of the inhomogeneity, this must satisfy u = A·u1 + (1-A)·u2
+instead of the usual freedom of u = A·u1 + B·u2.
+"""
 function TransformToPureIngoingOutgoing(C)
     x1 = -C[2,2] / (C[2,1] - C[2,2])
     x2 = -C[1,2] / (C[1,1] - C[1,2])
 
     M = [[x1;(1-x1)] [x2;(1-x2)]]
-    # display(C*M)
-    # display(C)
-    # display(M)
-    # error()
     return M
 end
 
-function ConvertToIngoingOutgoing(f, r, k, l)
-    coeffs = MatchSolution(f[:,:,end], r[end], k, l)
-    # display(coeffs)
-    M = TransformToPureIngoingOutgoing(coeffs)
-    # M = permutedims(M)
-    display(M)
+"""
+EliminateIngoing(u, u′, r, k, l)
 
-    return mapslices(x->x*M, f, dims=(1,2))
-end
-
+Matches to the boundary conditions for \tilde{u} using the output from `SolveOutwards`.
+"""
 function EliminateIngoing(u, u′, r, k, l)
     coeffs = MatchSolution(u[:,end], u′[:,end], r[end], k, l)
-    display(coeffs)
     M = TransformToPureIngoingOutgoing(coeffs)
     M = M[:,1:1]
     M = permutedims(M)
@@ -289,20 +173,30 @@ function EliminateIngoing(u, u′, r, k, l)
            dropdims(M*u′, dims=1)
 end
 
-using EllipsisNotation
+
+"""
+    AddBesselPart(r, tildeu, tildeu′, k, l)
+
+Includes the inhomogeneity that was missing from the ODE solution. i.e. converts
+from \tilde{u} to u.
+"""
 function AddBesselPart(r, tildeu, tildeu′, k, l)
-    # tildeu = tildef[1,..]
-    # tildeu′ = tildef[2,..]
     u = sqrt(4pi)*sqrt(2l+1) * 1/k * ricj.(l,k*r) + tildeu
     u′ = sqrt(4pi)*sqrt(2l+1) * 1/k * dricjdr.(l,k,r) + tildeu′
 
-    # f = vcat(ustrip(a0,u), u′)
     return u,u′
 end
 
-using LegendrePolynomials
-using QuadGK
-using Dierckx
+"""
+Tmat_l(r,u,potential,p,costh,l)
+
+Once a complete solution for u has been obtained, this function calculates the
+`T` matrix element. The `u` going into here must be the full matched solution
+and not \tilde{u}.
+
+Note: this was before I considered T_l. This term is instead one of the Legendre
+contributions of T(theta) for a specific `costh` and `l`.
+"""
 function Tmat_l(r,u,potential,p,costh,l)
     # One l component only. costh = p⋅z (or p⋅k more generally)
     V = r -> ustrip(Eh,potential(r*a0))
@@ -316,13 +210,21 @@ function Tmat_l(r,u,potential,p,costh,l)
     out *= a0*Eh*a0
     # These terms come from the plane wave prefactors for p.
     out *= sqrt(4pi)*sqrt(2l+1) * 1/p * Pl(costh,l)
-    #out *= sqrt(2l+1) * 1/p * Pl(costh,l)
     # Adjusting for my lack of (2π)^-3/2 in the wavefunctions
     out /= (2π)^3
 end
 
 fFromT(T,m=mₑ) = uconvert(a0, -(2pi)^2*m/ħ^2 * T)
 
+"""
+TCSandOptTheorem(faa, k)
+
+Compare the total cross section with the optical theorem result, assuming that
+`faa` is the forward scattering part (i.e. `faa` = f(θ=0)) and assuming a low
+enough energy that the scattering is s-wave.
+
+`faa` can be obtained from `fFromT`.
+"""
 function TCSandOptTheorem(faa, k)
     DCS = abs2(faa)
     TCS = 4pi * DCS
