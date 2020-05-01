@@ -1,5 +1,3 @@
-module ODE
-
 using DanUtils
 using Constants
 using BesselFunctions
@@ -238,4 +236,3 @@ end
 # |faa|^2 =a^2
 # -(2pi)^2*m/\hbar^2 * T = a
 # hbr^2 a / (2pi)^2 / m
-end

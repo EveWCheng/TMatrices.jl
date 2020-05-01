@@ -5,6 +5,8 @@ pyplot()
 
 #+RESULTS:
 :RESULTS:
+: ┌ Info: Precompiling TMatrices [d32406b6-cfbb-43c5-b6a9-648d7495ab4a]
+: └ @ Base loading.jl:1260
 : Plots.PyPlotBackend()
 :END:
 
@@ -39,8 +41,8 @@ pyplot()
 :END:
 
 #+BEGIN_SRC jupyter-julia
-  Gaussian = TMat.Gaussian
-  SquareWell = TMat.SquareWell
+  Gaussian = TMatrices.Gaussian
+  SquareWell = TMatrices.SquareWell
     # potfunc = R -> Gaussian(R, height=1e-1)
     # potfunc = R -> Gaussian(R, height=10.)
     # potfunc = R -> Gaussian(R, height=1e-3)
@@ -55,7 +57,7 @@ pyplot()
     # potfunc = R -> SquareWell(R, height=-1)
     # potfunc = R -> SquareWell(R, height=-1e-2)
 
-    potfunc = TMat.TestCase
+    potfunc = TMatrices.TestCase
 #+END_SRC
 
 #+RESULTS:
@@ -64,37 +66,21 @@ pyplot()
 :END:
 
 #+BEGIN_SRC jupyter-julia
-    k_list,u = TMat.LS.Quadrature(en)
+    k_list,u = TMatrices.LS.Quadrature(en)
 
-    M,Vmat = TMat.LS.SetupMatrix(k_list, target_k, potfunc, en, l, u ; rmin=rmin, rmax=rmax )
+    M,Vmat = TMatrices.LS.SetupMatrix(k_list, target_k, potfunc, en, l, u ; rmin=rmin, rmax=rmax )
     T = (I - M)\Vmat
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-#+BEGIN_EXAMPLE
-20×20 Array{Complex{Float64},2}:
-    -3.97516-0.101215im     …    0.00309788+0.000134479im
-    -3.97311-0.101203im          0.00309768+0.000134464im
-    -3.96925-0.101162im          0.00309716+0.000134417im
-    -3.96419-0.101114im          0.00309692+0.000134384im
-    -3.95799-0.10102im            0.0030962+0.000134296im
-    -3.95105-0.100871im     …    0.00309482+0.000134135im
-    -3.93549-0.100691im          0.00309321+0.000133945im
-    -3.92003-0.100501im          0.00309149+0.000133745im
-    -3.90821-0.10034im           0.00309006+0.000133578im
-    -3.90124-0.10024im            0.0030892+0.000133475im
-    -3.58814-0.0957395im    …    0.00304764+0.000128673im
-     -1.1293-0.0485208im         0.00248505+6.92046e-5im
-    0.230989+0.00982428im        0.00148838-2.01221e-5im
-    0.175352+0.00754731im       0.000580143-2.27694e-5im
-   0.0844545+0.00353487im      -0.000341784-1.14202e-5im
-  0.00031406-3.87629e-5im   …  -0.000678984-2.33456e-7im
-  -0.0229374-0.000989665im      0.000147088+2.99154e-6im
-  0.00707364+0.000311083im      0.000312549-8.91272e-7im
- -0.00166452-7.44323e-5im      -0.000481442+2.0412e-7im
-  0.00309788+0.000134479im       0.00132255-3.99945e-7im
-#+END_EXAMPLE
+# [goto error]
+: MethodError: no method matching SetupMatrix(::Array{Float64,1}, ::Float64, ::typeof(TMatrices.TestCase), ::Float64, ::Int64, ::Array{Complex{Float64},1}; rmin=1.0e-8, rmax=10.0)
+: Closest candidates are:
+:   SetupMatrix(::Any, ::Any, ::Any, ::Any; rmin, rmax, pot_k) at /home/pengwyn/work5/julia_packages/TMatrices/src/LS.jl:78
+: 
+: Stacktrace:
+:  [1] top-level scope at In[5]:2
 :END:
 
 #+BEGIN_SRC jupyter-julia
@@ -105,15 +91,10 @@ pyplot()
 #+RESULTS:
 :RESULTS:
 # [goto error]
-: ArgumentError: invalid index: nothing of type Nothing
+: UndefVarError: T not defined
 : 
 : Stacktrace:
-:  [1] to_index(::Nothing) at ./indices.jl:297
-:  [2] to_index(::Array{Complex{Float64},2}, ::Nothing) at ./indices.jl:274
-:  [3] to_indices at ./indices.jl:325 [inlined]
-:  [4] to_indices at ./indices.jl:322 [inlined]
-:  [5] getindex(::Array{Complex{Float64},2}, ::Nothing) at ./abstractarray.jl:980
-:  [6] top-level scope at In[16]:2
+:  [1] top-level scope at In[6]:2
 :END:
 
 #+BEGIN_SRC jupyter-julia
@@ -127,13 +108,13 @@ pyplot()
 : UndefVarError: T_ls not defined
 : 
 : Stacktrace:
-:  [1] top-level scope at In[8]:1
+:  [1] top-level scope at In[7]:1
 :END:
 
 #+BEGIN_SRC jupyter-julia
   en = 0.5
   l = 0
-TMat.LS.OnShellScattering(en, l, potfunc)
+TMatrices.LS.OnShellScattering(en, l, potfunc)
 #+END_SRC
 
 #+RESULTS:
@@ -144,7 +125,7 @@ TMat.LS.OnShellScattering(en, l, potfunc)
 #+BEGIN_SRC jupyter-julia
   en = -0.5 - 0.05im
   l = 0
-  k_list,T = TMat.LS.OffShellScattering(en, l, potfunc)
+  k_list,T = TMatrices.LS.OffShellScattering(en, l, potfunc)
 #+END_SRC
 
 #+RESULTS:
@@ -171,7 +152,7 @@ TMat.LS.OnShellScattering(en, l, potfunc)
 #+BEGIN_SRC jupyter-julia
 potode = R -> potfunc(ustrip(a0,R)) * Eₕ
 E_ode = en*Eh
-k_ode = TMat.ODE.kFromE(E_ode)
+k_ode = TMatrices.ODE.kFromE(E_ode)
 κ = k_ode
 rspan = (0.001a0, 50.0a0)
 #+END_SRC
@@ -182,7 +163,7 @@ rspan = (0.001a0, 50.0a0)
 :END:
 
 #+BEGIN_SRC jupyter-julia
-r,u,u′ = TMat.ODE.SolveOutwards(rspan, E_ode, k_ode, potode, l)
+r,u,u′ = TMatrices.ODE.SolveOutwards(rspan, E_ode, k_ode, potode, l)
 #+END_SRC
 
 #+RESULTS:
@@ -191,16 +172,13 @@ r,u,u′ = TMat.ODE.SolveOutwards(rspan, E_ode, k_ode, potode, l)
 :END:
 
   #+BEGIN_SRC jupyter-julia
-    X = TMat.ODE.MatchSolution(u[end], u′[end], r[end], κ, l)
-    soln2 = TMat.ODE.EliminateIngoing(u, u′, r, κ, l)
-    soln2 = TMat.ODE.AddBesselPart(r, soln2..., κ, l)
+    X = TMatrices.ODE.MatchSolution(u[end], u′[end], r[end], κ, l)
+    soln2 = TMatrices.ODE.EliminateIngoing(u, u′, r, κ, l)
+    soln2 = TMatrices.ODE.AddBesselPart(r, soln2..., κ, l)
   #+END_SRC
 
   #+RESULTS:
   :RESULTS:
-  : 2×2 Array{Complex{Float64},2}:
-  :    -0.630924+0.364555im     -1.42224+0.751952im
-  :  -4.00222e15-0.125im     -9.61086e15+0.375im
   | Quantity | (Complex (Float64) 𝐋 Unitful.FreeUnits ((a₀) 𝐋 nothing)) | (0.0 + 0.0im a₀ 0.005060816158067956 + 5.862900672075071e-10im a₀ 0.013138545197463315 + 5.536990639804973e-9im a₀ 0.022435098236395282 + 2.4870212750364033e-8im a₀ 0.033993709826116845 + 8.370431892092978e-8im a₀ 0.04704742124755085 + 2.1897745166883377e-7im a₀ 0.06181437915149836 + 4.930699819025234e-7im a₀ 0.07789355327277817 + 9.8156900578081e-7im a₀ 0.09520582452588663 + 1.7840883228276621e-6im a₀ 0.11349752939954594 + 3.008409927117985e-6im a₀ … -7.218927663734663e+21 + 5.626151738523861e21im a₀ -7.319055112085922e+21 + 5.696410758605193e21im a₀ -7.420566077992895e+21 + 5.767540445899356e21im a₀ -7.523479685965783e+21 + 5.839551546626373e21im a₀ -7.627815179981857e+21 + 5.912454837556346e21im a₀ -7.73359227684058e+21 + 5.986261372155965e21im a₀ -7.840830640802027e+21 + 6.060982112820803e21im a₀ -7.949550568033173e+21 + 6.136628407390519e21im a₀ -8.059772302580469e+21 + 6.213211511479106e21im a₀ -8.10445366503549e+21 + 6.244225892114776e21im a₀) | Complex | (Float64) | (2.831327928390701 + 1.772454146482824e-7im 2.8314183857749846 + 2.1247468343605896e-6im 2.831937546251062 + 8.051127454968008e-6im 2.8331051010182184 + 1.9155829097295466e-5im 2.8354063724543135 + 3.9340782308959664e-5im 2.839134917371482 + 7.060059887811304e-5im 2.844791435922939 + 0.00011670929836413393im 2.852677034234247 + 0.00017975280764245073im 2.863162848871193 + 0.00026237508459851864im 2.87646536158761 + 0.00036596207249134686im … -7.508880753322862e+21 + 5.320962382250972e21im -7.612641550816405e+21 + 5.387683986366169e21im -7.717831069067059e+21 + 5.455236336843692e21im -7.82446899305862e+21 + 5.52362974338361e21im -7.93257512891645e+21 + 5.592874546781235e21im -8.042169769994881e+21 + 5.662981352751041e21im -8.153273152495517e+21 + 5.733960682641128e21im -8.265906164562498e+21 + 5.805823426103686e21im -8.38008963754895e+21 + 5.878580387384751e21im -8.426375467144827e+21 + 5.908046479390732e21im) |
   :END:
 
@@ -218,7 +196,7 @@ r,u,u′ = TMat.ODE.SolveOutwards(rspan, E_ode, k_ode, potode, l)
   #+BEGIN_SRC jupyter-julia
     costh = 0.
     u2 = soln2[1]
-    T_ode = TMat.ODE.Tmat_l(r, u2, potode, k_ode, costh, l)
+    T_ode = TMatrices.ODE.Tmat_l(r, u2, potode, k_ode, costh, l)
     T_ode * 4π
   #+END_SRC
 
@@ -228,7 +206,7 @@ r,u,u′ = TMat.ODE.SolveOutwards(rspan, E_ode, k_ode, potode, l)
   :END:
 
   #+BEGIN_SRC jupyter-julia
-f_ode = TMat.ODE.fFromT(T_ode)
+f_ode = TMatrices.ODE.fFromT(T_ode)
   #+END_SRC
 
   #+RESULTS:
@@ -237,7 +215,7 @@ f_ode = TMat.ODE.fFromT(T_ode)
   :END:
   
   #+BEGIN_SRC jupyter-julia
-TMat.ODE.TCSandOptTheorem(f,κ)
+TMatrices.ODE.TCSandOptTheorem(f,κ)
   #+END_SRC
 
   #+RESULTS:
@@ -258,8 +236,8 @@ TMat.ODE.TCSandOptTheorem(f,κ)
   en1 = 1.5 + 0im
   en2 = 2.0 + 0im
   l = 0
-  k_list1,T1 = TMat.LS.OffShellScattering(en1, l, potfunc, N=70, N_mid=10)
-  k_list2,T2 = TMat.LS.OffShellScattering(en2, l, potfunc, N=70, N_mid=10)
+  k_list1,T1 = TMatrices.LS.OffShellScattering(en1, l, potfunc, N=70, N_mid=10)
+  k_list2,T2 = TMatrices.LS.OffShellScattering(en2, l, potfunc, N=70, N_mid=10)
 
   plot(k_list1, [real(diag(T1)) imag(diag(T1))], marker=:circle)
   plot!(k_list2, [real(diag(T2)) imag(diag(T2))], line=:dash, label="")
@@ -275,29 +253,34 @@ TMat.ODE.TCSandOptTheorem(f,κ)
 #+BEGIN_SRC jupyter-julia
   k_target = 0.0001
   c = 0.1
-  TMat.LS.SearchLax(k_target, potfunc, c, N=50)#, zero_limit=true)
-#+END_SRC
-
-#+BEGIN_SRC jupyter-julia
-  k_target = 0.2
-  c = 0.1
-  TMat.LS.SearchLax(k_target, potfunc, c, N=50)
+  TMatrices.LS.SearchLax(k_target, potfunc, c, N=50)#, zero_limit=true)
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-: -0.3113795021324754 - 1.217334355825745e-5im
+: -0.42819625397706873 - 1.7319448104438629e-6im
+:END:
+
+#+BEGIN_SRC jupyter-julia
+  k_target = 0.2
+  c = 0.1
+  TMatrices.LS.SearchLax(k_target, potfunc, c, N=50)
+#+END_SRC
+
+#+RESULTS:
+:RESULTS:
+: -0.37072103321134875 - 8.592368062640484e-6im
 :END:
 
 #+BEGIN_SRC jupyter-julia
   k_list = linspace(0, 2.0, 51)
   c = 0.1
-  E_list = TMat.LS.LaxScan(k_list, potfunc, c, N=10, α=0.1, tol=1e-5, max_iters=1001)
+  E_list = TMatrices.LS.LaxScan(k_list, potfunc, c, N=10, α=0.1, tol=1e-5, max_iters=1001)
 #+END_SRC
 
 #+RESULTS:
 :RESULTS:
-: [32mProgress: 100%|█████████████████████████████████████████| Time: 0:01:21[39m
+: [32mProgress: 100%|█████████████████████████████████████████| Time: 0:01:20[39m
 #+BEGIN_EXAMPLE
 51-element Array{Any,1}:
   -0.4340546068209168 - 1.0619384264165297e-5im

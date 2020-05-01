@@ -3,9 +3,17 @@ module TMatrices
 export LS,
     ODE
 
-include("quadrature.jl")
-include("LS.jl")
-include("ODE.jl")
+module LS
+    export SetupMatrix,
+        Quadrature
+
+    include("quadrature.jl")
+    include("LS.jl")
+end
+
+module ODE
+    include("ODE.jl")
+end
 
 
 """

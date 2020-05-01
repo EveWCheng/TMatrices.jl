@@ -1,9 +1,3 @@
-
-module LS
-
-export SetupMatrix,
-    Quadrature
-
 using BesselFunctions
 using LegendrePolynomials
 using QuadGK
@@ -223,5 +217,3 @@ function LaxScan(k_list, potfunc, c ; kwds...)
     return E_list
 end
     
-
-end
