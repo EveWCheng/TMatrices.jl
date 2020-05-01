@@ -1,13 +1,18 @@
-using DanUtils
-using Constants
+using Unitful
+using UnitfulAtomic
 using BesselFunctions
 using DifferentialEquations
 using LegendrePolynomials
 using QuadGK
 using Dierckx
 
-kFromE(E,m=1mₑ) = uconvert(u"a0^-1", sqrt(2*m*E) / ħ)
-EFromk(k,m=1mₑ) = uconvert(Eh, ħ^2*k^2/2m )
+const a0 = u"a0_au"
+const Eh = u"Eh_au"
+const me = u"me_au"
+const ħ = u"ħ_au"
+
+kFromE(E,m=1me) = uconvert(a0^-1, sqrt(2*m*E) / ħ)
+EFromk(k,m=1me) = uconvert(Eh, ħ^2*k^2/2m )
 
 """
     DerivFunc(u,u′,r, E,k,potential,l,m=1mₑ)
@@ -15,7 +20,7 @@ EFromk(k,m=1mₑ) = uconvert(Eh, ħ^2*k^2/2m )
 This is the differential equation derivative function. This function should work
 in Unitful quantities.
 """
-function DerivFunc(u,u′,r, E,k,potential,l,m=1mₑ)
+function DerivFunc(u,u′,r, E,k,potential,l,m=1me)
     # Expressing this as the plane wave expansion with the Y_l0 at the end,
     # gives rise to the sqrt() prefactors.
     jl = sqrt(4pi)*sqrt(2l+1) * 1/k * ricj(l, k*r)
@@ -212,7 +217,7 @@ function Tmat_l(r,u,potential,p,costh,l)
     out /= (2π)^3
 end
 
-fFromT(T,m=mₑ) = uconvert(a0, -(2pi)^2*m/ħ^2 * T)
+fFromT(T,m=me) = uconvert(a0, -(2pi)^2*m/ħ^2 * T)
 
 """
 TCSandOptTheorem(faa, k)

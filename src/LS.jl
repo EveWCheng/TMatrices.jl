@@ -1,9 +1,9 @@
+using LinearAlgebra
 using BesselFunctions
 using LegendrePolynomials
 using QuadGK
 using Dierckx
-using DanUtils
-
+using MsgWrap
 
 ####################################
 # * Potential funcs
@@ -75,11 +75,11 @@ function SetupMatrix(k_list,
                      )
 
     # I need all Vs connecting all ks to other ks
-    k1 = k_list[:,newaxis]
-    k2 = k_list[newaxis,:]
+    k1 = k_list
+    k2 = k_list'
 
     if pot_k == :auto
-        Δk_list = linspace(0., 2*maximum(k_list), 1001)
+        Δk_list = LinRange(0., 2*maximum(k_list), 1001)
         pot_k = PrepareInterpedVkk(pot_r, Δk_list, rmin=rmin, rmax=rmax)
     end
 
@@ -118,11 +118,11 @@ OnShellScattering(en, l, potfunc ; rmin=1e-4, rmax=10.)
 Like `OffShellScattering` but only solves for Tₗ(k,k) where ℏ²k²/2m = `en`.
 Returns a single value, in contrast to `OffShellScattering`.
 """
-function OnShellScattering(en, l, potfunc ; rmin=1e-4, rmax=10.)
+function OnShellScattering(en, l, potfunc ; rmin=1e-4, rmax=10., kwds...)
     target_k = sqrt(2*en)
 
     @assert isreal(target_k)
-    k_list,u = Quadrature(en)
+    k_list,u = Quadrature(en ; kwds...)
 
     M,Vmat = SetupMatrix(k_list, potfunc, l, u ; rmin=rmin, rmax=rmax )
 
@@ -162,7 +162,7 @@ function SearchLax(k_target, potfunc, c; N=10, max_iters=101, zero_limit=false, 
     K = k_target^2/2
     ESelfCon(T) = K + c*T
 
-    Δk_list = linspace(0., 10., 1001)
+    Δk_list = LinRange(0., 10., 1001)
     pot_k = PrepareInterpedVkk(potfunc, Δk_list, rmin=1e-4, rmax=10.)
 
     if guess == :auto
@@ -199,7 +199,7 @@ end
 
 
 using ProgressMeter
-function LaxScan(k_list, potfunc, c ; kwds...)
+function LaxScan(k_list, potfunc, c ; adjust_guess=true, kwds...)
     E_list = []
     guess = :auto
     @showprogress for k in k_list
@@ -210,7 +210,7 @@ function LaxScan(k_list, potfunc, c ; kwds...)
             NaN
         end
         push!(E_list, E)
-        if !isnan(E)
+        if adjust_guess && !isnan(E)
             guess = E
         end
     end
