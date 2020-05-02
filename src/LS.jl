@@ -158,9 +158,12 @@ Currently assumes s-wave scattering is sufficient to determine T.
 Note: it seems to be that a unique solution is not gaurnateed. And this may find
 solutions with positive imaginary parts which are unphysical.
 """
-function SearchLax(k_target, potfunc, c; N=10, max_iters=101, zero_limit=false, tol=1e-5, guess=:auto, α=1.)
+function SearchLax(k_target, potfunc, c; max_iters=101, zero_limit=false, tol=1e-5, guess=:auto, α=1., kwds...)
     K = k_target^2/2
-    ESelfCon(T) = K + c*T
+    # This comes from a factor of 4pi from my choice of Legendre expansion (T_0 -> T(a<-a))
+    # and a factor of 1/(2pi)^3 from the choice of plane wave in the # solution of T.
+    TEnergy(T) = 2*pi^2 * T
+    ESelfCon(T) = K + c*TEnergy(T)
 
     Δk_list = LinRange(0., 10., 1001)
     pot_k = PrepareInterpedVkk(potfunc, Δk_list, rmin=1e-4, rmax=10.)
@@ -176,7 +179,7 @@ function SearchLax(k_target, potfunc, c; N=10, max_iters=101, zero_limit=false, 
     for i = 1:max_iters
         i == max_iters && error("Max iterations ($max_iters) reached!")
 
-        k_list,T_mat = OffShellScattering(en, l, potfunc, N=N, pot_k=pot_k)
+        k_list,T_mat = OffShellScattering(en, l, potfunc, pot_k=pot_k ; kwds...)
         Tr = Spline1D(k_list, real.(diag(T_mat)))(k_target)
         Ti = Spline1D(k_list, imag.(diag(T_mat)))(k_target)
         T = Tr + im*Ti

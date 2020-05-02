@@ -36,7 +36,19 @@ TestCase(R)
 
 A sample potential which includes a repulsive barrier and an attractive part, to
 mimic an atomic system.
+
+The scattering length of this potential seems to be around 4.65 a0.
 """
 TestCase(R) = SquareWell(R, width=0.5, height=10.0) + Gaussian(R, width=2., height=-0.5)
+
+"""
+TestCase2(R)
+
+A sample potential which includes a repulsive barrier and an attractive part, to
+mimic an atomic system.
+
+The scattering length of this potential seems to be around -34 a0.
+"""
+TestCase2(R) = SquareWell(R, width=1.0, height=100.0) + Gaussian(R, width=2., height=-2.0)
 
 end # module
