@@ -1,7 +1,7 @@
 name = "TMatrices"
 uuid = "d32406b6-cfbb-43c5-b6a9-648d7495ab4a"
 authors = ["Daniel Cocks <daniel.cocks@gmail.com>"]
-version = "0.1.1-dev"
+version = "0.1.1"
 
 [deps]
 BesselFunctions = "4d59f32e-7137-4000-967d-44acb2105281"
