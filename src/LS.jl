@@ -79,7 +79,7 @@ function SetupMatrix(k_list,
     k2 = k_list'
 
     if pot_k == :auto
-        Δk_list = LinRange(0., 2*maximum(k_list), 1001)
+        Δk_list = LinRange(0., 2*maximum(k_list), 10001)
         pot_k = PrepareInterpedVkk(pot_r, Δk_list, rmin=rmin, rmax=rmax)
     end
 
@@ -134,9 +134,18 @@ function OnShellScattering(en, l, potfunc ; rmin=1e-4, rmax=10., kwds...)
     T[ind]
 end
 
+# For testing
+function OnShellFromOffShell(en, l, potfunc, k_target=Float64(sqrt(2*en))  ; kwds...)
+    # k_target = Float64(sqrt(2*en))
+
+    k_list,T_mat = OffShellScattering(en, l, potfunc ; kwds...)
+    Tr = Spline1D(k_list, real.(diag(T_mat)))(k_target)
+    Ti = Spline1D(k_list, imag.(diag(T_mat)))(k_target)
+    T = Tr + im*Ti
+end
 
 
-##############################################################
+    ##############################################################
 # * Applied to the Lax formalism
 #------------------------------------------------------------
 
@@ -158,15 +167,21 @@ Currently assumes s-wave scattering is sufficient to determine T.
 Note: it seems to be that a unique solution is not gaurnateed. And this may find
 solutions with positive imaginary parts which are unphysical.
 """
-function SearchLax(k_target, potfunc, c; max_iters=101, zero_limit=false, tol=1e-5, guess=:auto, α=1., kwds...)
+function SearchLax(k_target, potfunc, c; max_iters=101, zero_limit=false, tol=1e-5, guess=:auto, α=1., rmin, rmax, k_max=:auto, kwds...)
     K = k_target^2/2
     # This comes from a factor of 4pi from my choice of Legendre expansion (T_0 -> T(a<-a))
     # and a factor of 1/(2pi)^3 from the choice of plane wave in the # solution of T.
     TEnergy(T) = 2*pi^2 * T
     ESelfCon(T) = K + c*TEnergy(T)
 
-    Δk_list = LinRange(0., 10., 1001)
-    pot_k = PrepareInterpedVkk(potfunc, Δk_list, rmin=1e-4, rmax=10.)
+    if k_max == :auto
+        k_list,u = Quadrature(K ; kwds...)
+        # Note: got to go extra, because the energy will change.
+        k_max = maximum(k_list) * 4
+        @debug "Automatically chose k_max" k_max
+    end
+    Δk_list = LinRange(0., k_max, 10001)
+    pot_k = PrepareInterpedVkk(potfunc, Δk_list, rmin=rmin, rmax=rmax)
 
     if guess == :auto
         en = ESelfCon(0.)
@@ -180,12 +195,14 @@ function SearchLax(k_target, potfunc, c; max_iters=101, zero_limit=false, tol=1e
         i == max_iters && error("Max iterations ($max_iters) reached!")
 
         k_list,T_mat = OffShellScattering(en, l, potfunc, pot_k=pot_k ; kwds...)
+        maximum(k_list) > k_max && @warn "Energy creates a k_list with max > k_max" en k_max maximum(k_list)
+
         Tr = Spline1D(k_list, real.(diag(T_mat)))(k_target)
         Ti = Spline1D(k_list, imag.(diag(T_mat)))(k_target)
         T = Tr + im*Ti
 
         new_en = ESelfCon(T)
-        # @show en new_en T K
+        @debug "Iteration" en new_en T K TEnergy(T)
         if zero_limit
             # Still need the imaginary part here in case en goes negative (for sqrt).
             new_en = real(new_en) + 0im
